@@ -1,0 +1,199 @@
+<style>
+    .searchable {
+      width: 300px;
+      float: left;
+      margin: 0 15px;
+    }
+  
+    .searchable input {
+      width: 100%;
+      height: 50px;
+      font-size: 18px;
+      padding: 10px;
+      box-sizing: border-box;
+      display: block;
+      font-weight: 400;
+      line-height: 1.6;
+      color: #495057;
+      background-color: #fff;
+      border: 1px solid #ced4da;
+      border-radius: .25rem;
+      transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    }
+  
+    .searchable ul {
+      display: none;
+      list-style-type: none;
+      background-color: #fff;
+      border-radius: 0 0 5px 5px;
+      border: 1px solid #add8e6;
+      border-top: none;
+      max-height: 180px;
+      margin: 0;
+      overflow-y: scroll;
+      overflow-x: hidden;
+      padding: 0;
+    }
+  
+    .searchable ul li {
+      padding: 7px 9px;
+      border-bottom: 1px solid #e1e1e1;
+      cursor: pointer;
+      color: #6e6e6e;
+    }
+  
+  </style>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  
+  <!-- Country Dropdown -->
+  <span class="grid-item">
+    <div class="searchable">
+      <input type="text" placeholder="Search Country" id="countryInput" onclick="clickinputfunction(this , 'country')" onkeyup="filterFunction(this,event, 'country')">
+      <ul id="countryList"></ul>
+    </div>
+  </span>
+  <span class="grid-item"></span>
+  
+  <!-- State Dropdown -->
+  <span class="grid-item">
+    <div class="searchable">
+      <input type="text" placeholder="Search State" id="stateInput" onclick="clickinputfunction(this , 'state')" onkeyup="filterFunction(this,event, 'state')" disabled>
+      <ul id="stateList"></ul>
+    </div>
+  </span>
+  <span class="grid-item"></span>
+  
+  <script>
+
+    function clickinputfunction(element , val)
+    {
+        document.getElementById(element.id).value = "";
+        filterFunction(element, new KeyboardEvent('keyup'), val);
+    }
+    let countries = [];
+  
+    async function fetchCountriesData() {
+      try {
+        const response = await fetch('countries_states.json');
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        countries = await response.json();
+        populateCountryList();
+      } catch (error) {
+        console.error('Error fetching countries:', error);
+      }
+    }
+  
+    function populateCountryList() {
+      const countryList = document.getElementById('countryList');
+      countryList.innerHTML = '';
+      countries.forEach(country => {
+        let li = document.createElement('li');
+        li.textContent = country.name;
+        li.setAttribute('data-iso', country.iso3);
+        li.addEventListener('click', () => selectCountry(country.iso3));
+        countryList.appendChild(li);
+      });
+    }
+  
+    function selectCountry(iso3) {
+      const countryInput = document.getElementById('countryInput');
+      const selectedCountry = countries.find(country => country.iso3 === iso3);
+      countryInput.value = selectedCountry.name;
+      document.getElementById('countryList').style.display = 'none';
+      populateStateList(selectedCountry);
+      document.getElementById('stateInput').disabled = false;
+    }
+  
+    function populateStateList(country) {
+      const stateList = document.getElementById('stateList');
+      stateList.innerHTML = '';
+      country.states.forEach(state => {
+        let li = document.createElement('li');
+        li.textContent = state.name;
+        li.setAttribute('data-id', state.id);
+        li.addEventListener('click', () => selectState(state.name));
+        stateList.appendChild(li);
+      });
+    }
+  
+    function selectState(stateName) {
+      const stateInput = document.getElementById('stateInput');
+      stateInput.value = stateName;
+      document.getElementById('stateList').style.display = 'none';
+    }
+  
+    function filterFunction(inputElement, event, type) {
+      let container, input_val, ul;
+      container = $(inputElement).closest(".searchable");
+      input_val = container.find("input").val().toUpperCase();
+      ul = type === 'country' ? $('#countryList') : $('#stateList');
+  
+      if (["ArrowDown", "ArrowUp", "Enter"].indexOf(event.key) !== -1) {
+        keyControl(event, container);
+      } else {
+        ul.children('li').each(function () {
+          if ($(this).text().toUpperCase().indexOf(input_val) > -1) {
+            $(this).show();
+          } else {
+            $(this).hide();
+          }
+        });
+  
+        ul.children('li').removeClass("selected");
+        setTimeout(function () {
+          ul.children('li:visible').first().addClass("selected");
+        }, 100);
+      }
+    }
+  
+    function keyControl(e, container) {
+      let ul = container.find('ul');
+      if (e.key === "ArrowDown") {
+        if (ul.children('li').hasClass("selected")) {
+          if (ul.children('li:visible').index(ul.children('li.selected')) + 1 < ul.children('li:visible').length) {
+            ul.children('li.selected').removeClass("selected").nextAll().not('[style*="display: none"]').first().addClass("selected");
+          }
+        } else {
+          ul.children('li:first-child').addClass("selected");
+        }
+      } else if (e.key === "ArrowUp") {
+        if (ul.children('li:visible').index(ul.children('li.selected')) > 0) {
+          ul.children('li.selected').removeClass("selected").prevAll().not('[style*="display: none"]').first().addClass("selected");
+        }
+      } else if (e.key === "Enter") {
+        let selectedText = ul.children('li.selected').text();
+        container.find('input').val(selectedText).blur();
+
+
+        if (ul.attr('id') === 'countryList') {
+          selectCountry(ul.children('li.selected').attr('data-iso'));
+        } else {
+          selectState(selectedText);
+        }
+      }
+      ul.children('li.selected')[0].scrollIntoView({
+        behavior: "smooth",
+      });
+    }
+  
+    $(".searchable input").focus(function () {
+      $(this).closest(".searchable").find("ul").show();
+    });
+  
+    $(".searchable input").blur(function () {
+      let that = this;
+      setTimeout(function () {
+        $(that).closest(".searchable").find("ul").hide();
+      }, 300);
+    });
+  
+    $(document).on('click', '.searchable ul li', function () {
+      $(this).closest(".searchable").find("input").val($(this).text()).blur();
+    });
+  
+    fetchCountriesData();
+  </script>
+  
